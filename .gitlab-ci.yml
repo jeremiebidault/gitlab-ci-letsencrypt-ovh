@@ -1,0 +1,34 @@
+image: python:latest
+
+test:
+  tags:
+    - docker,machine
+  script:
+    - pip install certbot && pip install certbot-dns-ovh
+    - |
+      cat <<EOF > ovh.ini
+      dns_ovh_endpoint = ovh-eu
+      dns_ovh_application_key = $dns_ovh_application_key
+      dns_ovh_application_secret = $dns_ovh_application_secret
+      dns_ovh_consumer_key = $dns_ovh_consumer_key
+      EOF
+    - chmod 600 ovh.ini
+    - |
+      if [ $CERTBOT_DRY_RUN == "true" ]; then
+        echo "dry run"
+        certbot certonly --dry-run --dns-ovh --dns-ovh-credentials ovh.ini --non-interactive --agree-tos --email admin@domain.tld -d domain.tld -d *.domain.tld
+        mkdir -p /etc/letsencrypt/archive/domain.tld
+        touch /etc/letsencrypt/archive/domain.tld/hello.txt
+        touch /etc/letsencrypt/archive/domain.tld/world.txt
+        tar -cvf domain.tld.tar -C /etc/letsencrypt/archive/domain.tld .
+      elif [ $CERTBOT_DRY_RUN == "false" ]; then
+        echo "run"
+        certbot certonly --dns-ovh --dns-ovh-credentials ovh.ini --non-interactive --agree-tos --email admin@domain.tld -d domain.tld -d *.domain.tld
+        tar -cvf domain.tld.tar -C /etc/letsencrypt/archive/domain.tld .
+      else
+        echo "\$CERTBOT_DRY_RUN must be true or false"
+      fi
+  artifacts:
+    paths:
+      - domain.tld.tar
+    expire_in: 1 hour
